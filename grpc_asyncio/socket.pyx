@@ -97,6 +97,7 @@ cdef class Socket:
         self.read_buffer = buffer_
  
     cdef void write(self, grpc_slice_buffer * g_slice_buffer, grpc_custom_write_callback g_write_cb):
+        cdef char* start
         buffer_ = bytearray()
         for i in range(g_slice_buffer.count):
             start = grpc_slice_buffer_start(g_slice_buffer, i)

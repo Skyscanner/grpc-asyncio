@@ -230,8 +230,9 @@ cdef extern from "grpc/grpc.h":
         grpc_experimental_completion_queue_functor* shutdown_callback,
         void *reserved) nogil
 
-    grpc_completion_queue *grpc_completion_queue_create_for_next(
-        void *reserved) nogil
+    void grpc_completion_queue_shutdown(grpc_completion_queue *cq) nogil
+
+    void grpc_completion_queue_destroy(grpc_completion_queue *cq) nogil
 
     grpc_channel *grpc_insecure_channel_create(
         const char *target,
@@ -260,6 +261,8 @@ cdef extern from "grpc/grpc.h":
         const grpc_slice *host,
         gpr_timespec deadline,
         void *reserved) nogil
+
+    void grpc_call_unref(grpc_call *call) nogil
 
     grpc_call_error grpc_call_start_batch(
         grpc_call *call,

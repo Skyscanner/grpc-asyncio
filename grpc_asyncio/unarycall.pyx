@@ -18,6 +18,10 @@ cdef class _UnaryCall:
         self.watcher_call.obj = <cpython.PyObject *> self
         self._waiter_call = None
 
+    def __dealloc__(self):
+        grpc_completion_queue_shutdown(self.cq)
+        grpc_completion_queue_destroy(self.cq)
+
     def __repr__(self):
         class_name = self.__class__.__name__ 
         id_ = id(self)
@@ -45,6 +49,7 @@ cdef class _UnaryCall:
         cdef grpc_slice message_slice
         cdef grpc_byte_buffer * message_byte_buffer
         cdef grpc_metadata_array recv_initial_metadata
+        cdef grpc_byte_buffer * send_message_byte_buffer
         cdef grpc_byte_buffer * recv_message_byte_buffer
         cdef grpc_byte_buffer_reader recv_message_reader
         cdef bint recv_message_reader_status
@@ -58,6 +63,7 @@ cdef class _UnaryCall:
         cdef grpc_call_error call_status
 
         recv_message_byte_buffer = NULL
+        send_message_byte_buffer = NULL
 
         method_slice = grpc_slice_from_copied_buffer(
             <const char *> method,
@@ -128,27 +134,38 @@ cdef class _UnaryCall:
             NULL
         )
 
-        if call_status != GRPC_CALL_OK:
-            self._waiter_call = None
-            raise Exception("Error with grpc_call_start_batch {}".format(call_status))
+        try:
+            if call_status != GRPC_CALL_OK:
+                self._waiter_call = None
+                raise Exception("Error with grpc_call_start_batch {}".format(call_status))
 
-        await self._waiter_call
+            await self._waiter_call
 
-        if recv_message_byte_buffer != NULL:
-            recv_message_reader_status = grpc_byte_buffer_reader_init(
-                &recv_message_reader,
-                recv_message_byte_buffer
-            )
-            if recv_message_reader_status:
-                message = bytearray()
-                while grpc_byte_buffer_reader_next(&recv_message_reader, &recv_message_slice):
-                    recv_message_slice_pointer = grpc_slice_start_ptr(recv_message_slice)
-                    recv_message_slice_length = grpc_slice_length(recv_message_slice)
-                    message += (<char *>recv_message_slice_pointer)[:recv_message_slice_length]
-                    grpc_slice_unref(recv_message_slice)
-                grpc_byte_buffer_reader_destroy(&recv_message_reader)
-                return bytes(message)
+            if recv_message_byte_buffer != NULL:
+                recv_message_reader_status = grpc_byte_buffer_reader_init(
+                    &recv_message_reader,
+                    recv_message_byte_buffer
+                )
+                if recv_message_reader_status:
+                    message = bytearray()
+                    while grpc_byte_buffer_reader_next(&recv_message_reader, &recv_message_slice):
+                        recv_message_slice_pointer = grpc_slice_start_ptr(recv_message_slice)
+                        recv_message_slice_length = grpc_slice_length(recv_message_slice)
+                        message += (<char *>recv_message_slice_pointer)[:recv_message_slice_length]
+                        grpc_slice_unref(recv_message_slice)
+                    grpc_byte_buffer_reader_destroy(&recv_message_reader)
+                    return bytes(message)
+                else:
+                    return None
             else:
                 return None
-        else:
-            return None
+        finally:
+            grpc_byte_buffer_destroy(send_message_byte_buffer)
+            grpc_metadata_array_destroy(&recv_trailing_metadata)
+            grpc_byte_buffer_destroy(recv_message_byte_buffer)
+            grpc_metadata_array_destroy(&recv_initial_metadata)
+            grpc_slice_unref(recv_status_details)
+            if recv_error_string != NULL:
+                gpr_free(<void*>recv_error_string)
+            grpc_call_unref(call)
+            gpr_free(ops)

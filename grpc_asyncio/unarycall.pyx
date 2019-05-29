@@ -138,27 +138,27 @@ cdef class _UnaryCall:
             if call_status != GRPC_CALL_OK:
                 self._waiter_call = None
                 raise Exception("Error with grpc_call_start_batch {}".format(call_status))
-            else:
-                await self._waiter_call
 
-                if recv_message_byte_buffer != NULL:
-                    recv_message_reader_status = grpc_byte_buffer_reader_init(
-                        &recv_message_reader,
-                        recv_message_byte_buffer
-                    )
-                    if recv_message_reader_status:
-                        message = bytearray()
-                        while grpc_byte_buffer_reader_next(&recv_message_reader, &recv_message_slice):
-                            recv_message_slice_pointer = grpc_slice_start_ptr(recv_message_slice)
-                            recv_message_slice_length = grpc_slice_length(recv_message_slice)
-                            message += (<char *>recv_message_slice_pointer)[:recv_message_slice_length]
-                            grpc_slice_unref(recv_message_slice)
-                        grpc_byte_buffer_reader_destroy(&recv_message_reader)
-                        return bytes(message)
-                    else:
-                        return None
+            await self._waiter_call
+
+            if recv_message_byte_buffer != NULL:
+                recv_message_reader_status = grpc_byte_buffer_reader_init(
+                    &recv_message_reader,
+                    recv_message_byte_buffer
+                )
+                if recv_message_reader_status:
+                    message = bytearray()
+                    while grpc_byte_buffer_reader_next(&recv_message_reader, &recv_message_slice):
+                        recv_message_slice_pointer = grpc_slice_start_ptr(recv_message_slice)
+                        recv_message_slice_length = grpc_slice_length(recv_message_slice)
+                        message += (<char *>recv_message_slice_pointer)[:recv_message_slice_length]
+                        grpc_slice_unref(recv_message_slice)
+                    grpc_byte_buffer_reader_destroy(&recv_message_reader)
+                    return bytes(message)
                 else:
                     return None
+            else:
+                return None
         finally:
             grpc_byte_buffer_destroy(send_message_byte_buffer)
             grpc_metadata_array_destroy(&recv_trailing_metadata)

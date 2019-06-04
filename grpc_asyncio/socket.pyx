@@ -1,6 +1,10 @@
+import asyncio
 import socket
 
 from libc cimport string
+
+include "streams.pyx"
+
 
 cdef class Socket:
     def __cinit__(self):
@@ -80,19 +84,24 @@ cdef class Socket:
     cdef void connect(self, object host, object port, grpc_custom_connect_callback g_connect_cb):
         assert not self.task_connect
 
+        self.g_connect_cb = g_connect_cb
         self.task_connect = asyncio.create_task(
-            asyncio.open_connection(host, port)
+            open_connection(host, port)
         )
         self.task_connect.add_done_callback(self._connect_cb)
-        self.g_connect_cb = g_connect_cb
 
     cdef void read(self, char * buffer_, size_t length, grpc_custom_read_callback g_read_cb):
         assert not self.task_read
 
-        self.task_read = asyncio.create_task(
-            self.reader.read(n=length)
-        )
-        self.task_read.add_done_callback(self._read_cb)
+        if self.reader.is_data_available(length):
+          self._read_cb(self.reader.read(n=length))
+
+        else:
+          self.task_read = asyncio.create_task(
+              self.reader.read(n=length)
+          )
+          self.task_read.add_done_callback(self._read_cb)
+
         self.g_read_cb = g_read_cb
         self.read_buffer = buffer_
  

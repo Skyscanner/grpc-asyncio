@@ -28,6 +28,7 @@ file `guide <https://github.com/grpc/grpc/blob/master/BUILDING.md>`_ and follow 
     $ cd grpc-asyncio/vendor/grpc
     $ git submodule init
     $ git submodule update --recursive
+    $ git submodule update --init
     $ make
 
 For debugging purposes the library can be compiled in debug mode, as can be seen in the following command::
